@@ -4,6 +4,15 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
+    private const string SaveExistsKey = "SaveExists";
+    private const string MoneyKey = "Money";
+    private const string ProductsKey = "Products";
+    private const string ProductionPerClickKey = "ProductionPerClick";
+    private const string SellPriceKey = "SellPrice";
+    private const string UpgradeCostKey = "UpgradeCost";
+    private const string WorkersKey = "Workers";
+    private const string WorkerCostKey = "WorkerCost";
+
     [SerializeField] private TMP_Text moneyText;
     [SerializeField] private TMP_Text productsText;
     [SerializeField] private TMP_Text workersText;
@@ -20,6 +29,7 @@ public class GameManager : MonoBehaviour
     private int workers = 0;
     private int workerCost = 100;
     private float workerTimer = 0f;
+    private float autosaveTimer = 0f;
 
     private void Awake()
     {
@@ -28,6 +38,7 @@ public class GameManager : MonoBehaviour
         upgradeButton.onClick.AddListener(Upgrade);
         hireWorkerButton.onClick.AddListener(HireWorker);
 
+        LoadGame();
         UpdateUI();
     }
 
@@ -39,16 +50,21 @@ public class GameManager : MonoBehaviour
         }
 
         workerTimer += Time.deltaTime;
+        autosaveTimer += Time.deltaTime;
 
-        if (workerTimer < 1f)
+        if (workerTimer >= 1f)
         {
-            return;
+            int elapsedSeconds = Mathf.FloorToInt(workerTimer);
+            products += workers * elapsedSeconds;
+            workerTimer -= elapsedSeconds;
+            UpdateUI();
         }
 
-        int elapsedSeconds = Mathf.FloorToInt(workerTimer);
-        products += workers * elapsedSeconds;
-        workerTimer -= elapsedSeconds;
-        UpdateUI();
+        if (autosaveTimer >= 10f)
+        {
+            autosaveTimer = 0f;
+            SaveGame();
+        }
     }
 
     private void OnDestroy()
@@ -59,9 +75,15 @@ public class GameManager : MonoBehaviour
         hireWorkerButton.onClick.RemoveListener(HireWorker);
     }
 
+    private void OnApplicationQuit()
+    {
+        SaveGame();
+    }
+
     private void Produce()
     {
         products += productionPerClick;
+        SaveGame();
         UpdateUI();
     }
 
@@ -74,6 +96,7 @@ public class GameManager : MonoBehaviour
 
         products--;
         money += sellPrice;
+        SaveGame();
         UpdateUI();
     }
 
@@ -87,6 +110,7 @@ public class GameManager : MonoBehaviour
         money -= upgradeCost;
         productionPerClick++;
         upgradeCost *= 2;
+        SaveGame();
         UpdateUI();
     }
 
@@ -100,7 +124,62 @@ public class GameManager : MonoBehaviour
         money -= workerCost;
         workers++;
         workerCost = Mathf.CeilToInt(workerCost * 1.5f);
+        SaveGame();
         UpdateUI();
+    }
+
+    public void SaveGame()
+    {
+        PlayerPrefs.SetInt(SaveExistsKey, 1);
+        PlayerPrefs.SetInt(MoneyKey, money);
+        PlayerPrefs.SetInt(ProductsKey, products);
+        PlayerPrefs.SetInt(ProductionPerClickKey, productionPerClick);
+        PlayerPrefs.SetInt(SellPriceKey, sellPrice);
+        PlayerPrefs.SetInt(UpgradeCostKey, upgradeCost);
+        PlayerPrefs.SetInt(WorkersKey, workers);
+        PlayerPrefs.SetInt(WorkerCostKey, workerCost);
+        PlayerPrefs.Save();
+    }
+
+    public void LoadGame()
+    {
+        if (!PlayerPrefs.HasKey(SaveExistsKey))
+        {
+            return;
+        }
+
+        money = PlayerPrefs.GetInt(MoneyKey, money);
+        products = PlayerPrefs.GetInt(ProductsKey, products);
+        productionPerClick = PlayerPrefs.GetInt(ProductionPerClickKey, productionPerClick);
+        sellPrice = PlayerPrefs.GetInt(SellPriceKey, sellPrice);
+        upgradeCost = PlayerPrefs.GetInt(UpgradeCostKey, upgradeCost);
+        workers = PlayerPrefs.GetInt(WorkersKey, workers);
+        workerCost = PlayerPrefs.GetInt(WorkerCostKey, workerCost);
+    }
+
+    public void ResetSave()
+    {
+        PlayerPrefs.DeleteKey(SaveExistsKey);
+        PlayerPrefs.DeleteKey(MoneyKey);
+        PlayerPrefs.DeleteKey(ProductsKey);
+        PlayerPrefs.DeleteKey(ProductionPerClickKey);
+        PlayerPrefs.DeleteKey(SellPriceKey);
+        PlayerPrefs.DeleteKey(UpgradeCostKey);
+        PlayerPrefs.DeleteKey(WorkersKey);
+        PlayerPrefs.DeleteKey(WorkerCostKey);
+
+        money = 0;
+        products = 0;
+        productionPerClick = 1;
+        sellPrice = 5;
+        upgradeCost = 25;
+        workers = 0;
+        workerCost = 100;
+        workerTimer = 0f;
+        autosaveTimer = 0f;
+
+        UpdateUI();
+        SaveGame();
     }
 
     private void UpdateUI()
