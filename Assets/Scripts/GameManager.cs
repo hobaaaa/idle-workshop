@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,6 +13,8 @@ public class GameManager : MonoBehaviour
     private const string UpgradeCostKey = "UpgradeCost";
     private const string WorkersKey = "Workers";
     private const string WorkerCostKey = "WorkerCost";
+    private const string LastSaveTimeKey = "LastSaveTime";
+    private const int MaxOfflineSeconds = 8 * 60 * 60;
 
     [SerializeField] private TMP_Text moneyText;
     [SerializeField] private TMP_Text productsText;
@@ -30,6 +33,9 @@ public class GameManager : MonoBehaviour
     private int workerCost = 100;
     private float workerTimer = 0f;
     private float autosaveTimer = 0f;
+
+    public int LastOfflineSeconds { get; private set; }
+    public int LastOfflineProducts { get; private set; }
 
     private void Awake()
     {
@@ -138,15 +144,21 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.SetInt(UpgradeCostKey, upgradeCost);
         PlayerPrefs.SetInt(WorkersKey, workers);
         PlayerPrefs.SetInt(WorkerCostKey, workerCost);
+        PlayerPrefs.SetString(LastSaveTimeKey, DateTime.UtcNow.Ticks.ToString());
         PlayerPrefs.Save();
     }
 
     public void LoadGame()
     {
+        LastOfflineSeconds = 0;
+        LastOfflineProducts = 0;
+
         if (!PlayerPrefs.HasKey(SaveExistsKey))
         {
             return;
         }
+
+        string lastSaveTime = PlayerPrefs.GetString(LastSaveTimeKey, string.Empty);
 
         money = PlayerPrefs.GetInt(MoneyKey, money);
         products = PlayerPrefs.GetInt(ProductsKey, products);
@@ -155,6 +167,8 @@ public class GameManager : MonoBehaviour
         upgradeCost = PlayerPrefs.GetInt(UpgradeCostKey, upgradeCost);
         workers = PlayerPrefs.GetInt(WorkersKey, workers);
         workerCost = PlayerPrefs.GetInt(WorkerCostKey, workerCost);
+
+        ApplyOfflineProgress(lastSaveTime);
     }
 
     public void ResetSave()
@@ -167,6 +181,7 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.DeleteKey(UpgradeCostKey);
         PlayerPrefs.DeleteKey(WorkersKey);
         PlayerPrefs.DeleteKey(WorkerCostKey);
+        PlayerPrefs.DeleteKey(LastSaveTimeKey);
 
         money = 0;
         products = 0;
@@ -177,8 +192,43 @@ public class GameManager : MonoBehaviour
         workerCost = 100;
         workerTimer = 0f;
         autosaveTimer = 0f;
+        LastOfflineSeconds = 0;
+        LastOfflineProducts = 0;
 
         UpdateUI();
+        SaveGame();
+    }
+
+    private void ApplyOfflineProgress(string lastSaveTime)
+    {
+        if (workers == 0)
+        {
+            return;
+        }
+
+        if (!long.TryParse(lastSaveTime, out long lastSaveTicks))
+        {
+            return;
+        }
+
+        if (lastSaveTicks < DateTime.MinValue.Ticks || lastSaveTicks > DateTime.MaxValue.Ticks)
+        {
+            return;
+        }
+
+        DateTime lastSaveUtc = new DateTime(lastSaveTicks, DateTimeKind.Utc);
+        TimeSpan elapsedTime = DateTime.UtcNow - lastSaveUtc;
+
+        if (elapsedTime.TotalSeconds <= 0)
+        {
+            return;
+        }
+
+        double elapsedSeconds = Math.Floor(elapsedTime.TotalSeconds);
+        LastOfflineSeconds = (int)Math.Min(elapsedSeconds, MaxOfflineSeconds);
+        LastOfflineProducts = workers * LastOfflineSeconds;
+        products += LastOfflineProducts;
+
         SaveGame();
     }
 
