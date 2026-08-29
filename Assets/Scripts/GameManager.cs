@@ -15,6 +15,8 @@ public class GameManager : MonoBehaviour
     private const string WorkerCostKey = "WorkerCost";
     private const string WorkerEfficiencyLevelKey = "WorkerEfficiencyLevel";
     private const string WorkerEfficiencyUpgradeCostKey = "WorkerEfficiencyUpgradeCost";
+    private const string AutoSellersKey = "AutoSellers";
+    private const string AutoSellerCostKey = "AutoSellerCost";
     private const string LastSaveTimeKey = "LastSaveTime";
     private const int MaxOfflineSeconds = 8 * 60 * 60;
 
@@ -22,11 +24,13 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TMP_Text productsText;
     [SerializeField] private TMP_Text workersText;
     [SerializeField] private TMP_Text workerEfficiencyText;
+    [SerializeField] private TMP_Text autoSellerText;
     [SerializeField] private Button produceButton;
     [SerializeField] private Button sellButton;
     [SerializeField] private Button upgradeButton;
     [SerializeField] private Button hireWorkerButton;
     [SerializeField] private Button workerEfficiencyUpgradeButton;
+    [SerializeField] private Button hireAutoSellerButton;
 
     private int money = 0;
     private int products = 0;
@@ -37,11 +41,16 @@ public class GameManager : MonoBehaviour
     private int workerCost = 100;
     private int workerEfficiencyLevel = 1;
     private int workerEfficiencyUpgradeCost = 250;
+    private int autoSellers = 0;
+    private int autoSellerCost = 750;
     private float workerTimer = 0f;
+    private float autoSellTimer = 0f;
     private float autosaveTimer = 0f;
 
     public int LastOfflineSeconds { get; private set; }
     public int LastOfflineProducts { get; private set; }
+    public int LastOfflineSoldProducts { get; private set; }
+    public int LastOfflineMoneyEarned { get; private set; }
 
     private void Awake()
     {
@@ -50,6 +59,7 @@ public class GameManager : MonoBehaviour
         upgradeButton.onClick.AddListener(Upgrade);
         hireWorkerButton.onClick.AddListener(HireWorker);
         workerEfficiencyUpgradeButton.onClick.AddListener(UpgradeWorkerEfficiency);
+        hireAutoSellerButton.onClick.AddListener(HireAutoSeller);
 
         LoadGame();
         UpdateUI();
@@ -57,20 +67,41 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
-        if (workers == 0)
+        if (workers == 0 && autoSellers == 0)
         {
             return;
         }
 
-        workerTimer += Time.deltaTime;
         autosaveTimer += Time.deltaTime;
 
-        if (workerTimer >= 1f)
+        if (workers > 0)
         {
-            int elapsedSeconds = Mathf.FloorToInt(workerTimer);
-            products += workers * workerEfficiencyLevel * elapsedSeconds;
-            workerTimer -= elapsedSeconds;
-            UpdateUI();
+            workerTimer += Time.deltaTime;
+
+            if (workerTimer >= 1f)
+            {
+                int elapsedSeconds = Mathf.FloorToInt(workerTimer);
+                products += workers * workerEfficiencyLevel * elapsedSeconds;
+                workerTimer -= elapsedSeconds;
+                UpdateUI();
+            }
+        }
+
+        if (autoSellers > 0)
+        {
+            autoSellTimer += Time.deltaTime;
+
+            if (autoSellTimer >= 1f)
+            {
+                int elapsedSeconds = Mathf.FloorToInt(autoSellTimer);
+                int sellCapacity = autoSellers * elapsedSeconds;
+                int actualSold = Mathf.Min(products, sellCapacity);
+
+                products -= actualSold;
+                money += actualSold * sellPrice;
+                autoSellTimer -= elapsedSeconds;
+                UpdateUI();
+            }
         }
 
         if (autosaveTimer >= 10f)
@@ -87,6 +118,7 @@ public class GameManager : MonoBehaviour
         upgradeButton.onClick.RemoveListener(Upgrade);
         hireWorkerButton.onClick.RemoveListener(HireWorker);
         workerEfficiencyUpgradeButton.onClick.RemoveListener(UpgradeWorkerEfficiency);
+        hireAutoSellerButton.onClick.RemoveListener(HireAutoSeller);
     }
 
     private void OnApplicationQuit()
@@ -156,6 +188,20 @@ public class GameManager : MonoBehaviour
         UpdateUI();
     }
 
+    private void HireAutoSeller()
+    {
+        if (money < autoSellerCost)
+        {
+            return;
+        }
+
+        money -= autoSellerCost;
+        autoSellers++;
+        autoSellerCost = Mathf.CeilToInt(autoSellerCost * 1.5f);
+        SaveGame();
+        UpdateUI();
+    }
+
     public void SaveGame()
     {
         PlayerPrefs.SetInt(SaveExistsKey, 1);
@@ -168,6 +214,8 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.SetInt(WorkerCostKey, workerCost);
         PlayerPrefs.SetInt(WorkerEfficiencyLevelKey, workerEfficiencyLevel);
         PlayerPrefs.SetInt(WorkerEfficiencyUpgradeCostKey, workerEfficiencyUpgradeCost);
+        PlayerPrefs.SetInt(AutoSellersKey, autoSellers);
+        PlayerPrefs.SetInt(AutoSellerCostKey, autoSellerCost);
         PlayerPrefs.SetString(LastSaveTimeKey, DateTime.UtcNow.Ticks.ToString());
         PlayerPrefs.Save();
     }
@@ -176,6 +224,8 @@ public class GameManager : MonoBehaviour
     {
         LastOfflineSeconds = 0;
         LastOfflineProducts = 0;
+        LastOfflineSoldProducts = 0;
+        LastOfflineMoneyEarned = 0;
 
         if (!PlayerPrefs.HasKey(SaveExistsKey))
         {
@@ -193,6 +243,8 @@ public class GameManager : MonoBehaviour
         workerCost = PlayerPrefs.GetInt(WorkerCostKey, workerCost);
         workerEfficiencyLevel = PlayerPrefs.GetInt(WorkerEfficiencyLevelKey, workerEfficiencyLevel);
         workerEfficiencyUpgradeCost = PlayerPrefs.GetInt(WorkerEfficiencyUpgradeCostKey, workerEfficiencyUpgradeCost);
+        autoSellers = PlayerPrefs.GetInt(AutoSellersKey, autoSellers);
+        autoSellerCost = PlayerPrefs.GetInt(AutoSellerCostKey, autoSellerCost);
 
         ApplyOfflineProgress(lastSaveTime);
     }
@@ -209,6 +261,8 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.DeleteKey(WorkerCostKey);
         PlayerPrefs.DeleteKey(WorkerEfficiencyLevelKey);
         PlayerPrefs.DeleteKey(WorkerEfficiencyUpgradeCostKey);
+        PlayerPrefs.DeleteKey(AutoSellersKey);
+        PlayerPrefs.DeleteKey(AutoSellerCostKey);
         PlayerPrefs.DeleteKey(LastSaveTimeKey);
 
         money = 0;
@@ -220,10 +274,15 @@ public class GameManager : MonoBehaviour
         workerCost = 100;
         workerEfficiencyLevel = 1;
         workerEfficiencyUpgradeCost = 250;
+        autoSellers = 0;
+        autoSellerCost = 750;
         workerTimer = 0f;
+        autoSellTimer = 0f;
         autosaveTimer = 0f;
         LastOfflineSeconds = 0;
         LastOfflineProducts = 0;
+        LastOfflineSoldProducts = 0;
+        LastOfflineMoneyEarned = 0;
 
         UpdateUI();
         SaveGame();
@@ -231,7 +290,10 @@ public class GameManager : MonoBehaviour
 
     private void ApplyOfflineProgress(string lastSaveTime)
     {
-        if (workers == 0)
+        LastOfflineSoldProducts = 0;
+        LastOfflineMoneyEarned = 0;
+
+        if (workers == 0 && autoSellers == 0)
         {
             return;
         }
@@ -259,6 +321,12 @@ public class GameManager : MonoBehaviour
         LastOfflineProducts = workers * workerEfficiencyLevel * LastOfflineSeconds;
         products += LastOfflineProducts;
 
+        int sellCapacity = autoSellers * LastOfflineSeconds;
+        LastOfflineSoldProducts = Mathf.Min(products, sellCapacity);
+        LastOfflineMoneyEarned = LastOfflineSoldProducts * sellPrice;
+        products -= LastOfflineSoldProducts;
+        money += LastOfflineMoneyEarned;
+
         SaveGame();
     }
 
@@ -268,8 +336,10 @@ public class GameManager : MonoBehaviour
         productsText.text = $"Products: {products}";
         workersText.text = $"Workers: {workers}";
         workerEfficiencyText.text = $"Worker Efficiency: x{workerEfficiencyLevel}";
+        autoSellerText.text = $"Auto Sellers: {autoSellers}";
         upgradeButton.GetComponentInChildren<TMP_Text>().text = $"UPGRADE - ${upgradeCost}";
         hireWorkerButton.GetComponentInChildren<TMP_Text>().text = $"HIRE WORKER - ${workerCost}";
         workerEfficiencyUpgradeButton.GetComponentInChildren<TMP_Text>().text = $"IMPROVE WORKERS - ${workerEfficiencyUpgradeCost}";
+        hireAutoSellerButton.GetComponentInChildren<TMP_Text>().text = $"HIRE AUTO SELLER - ${autoSellerCost}";
     }
 }
