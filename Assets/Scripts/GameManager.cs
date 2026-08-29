@@ -17,6 +17,10 @@ public class GameManager : MonoBehaviour
     private const string WorkerEfficiencyUpgradeCostKey = "WorkerEfficiencyUpgradeCost";
     private const string AutoSellersKey = "AutoSellers";
     private const string AutoSellerCostKey = "AutoSellerCost";
+    private const string ChairUnlockedKey = "ChairUnlocked";
+    private const string ChairsKey = "Chairs";
+    private const string ChairProductionPerClickKey = "ChairProductionPerClick";
+    private const string ChairSellPriceKey = "ChairSellPrice";
     private const string LastSaveTimeKey = "LastSaveTime";
     private const int MaxOfflineSeconds = 8 * 60 * 60;
 
@@ -25,12 +29,17 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TMP_Text workersText;
     [SerializeField] private TMP_Text workerEfficiencyText;
     [SerializeField] private TMP_Text autoSellerText;
+    [SerializeField] private TMP_Text chairTitleText;
+    [SerializeField] private TMP_Text chairsText;
     [SerializeField] private Button produceButton;
     [SerializeField] private Button sellButton;
     [SerializeField] private Button upgradeButton;
     [SerializeField] private Button hireWorkerButton;
     [SerializeField] private Button workerEfficiencyUpgradeButton;
     [SerializeField] private Button hireAutoSellerButton;
+    [SerializeField] private Button unlockChairButton;
+    [SerializeField] private Button produceChairButton;
+    [SerializeField] private Button sellChairButton;
 
     private int money = 0;
     private int products = 0;
@@ -43,6 +52,11 @@ public class GameManager : MonoBehaviour
     private int workerEfficiencyUpgradeCost = 250;
     private int autoSellers = 0;
     private int autoSellerCost = 750;
+    private bool chairUnlocked = false;
+    private int chairs = 0;
+    private int chairUnlockCost = 2500;
+    private int chairProductionPerClick = 1;
+    private int chairSellPrice = 50;
     private float workerTimer = 0f;
     private float autoSellTimer = 0f;
     private float autosaveTimer = 0f;
@@ -60,6 +74,9 @@ public class GameManager : MonoBehaviour
         hireWorkerButton.onClick.AddListener(HireWorker);
         workerEfficiencyUpgradeButton.onClick.AddListener(UpgradeWorkerEfficiency);
         hireAutoSellerButton.onClick.AddListener(HireAutoSeller);
+        unlockChairButton.onClick.AddListener(UnlockChair);
+        produceChairButton.onClick.AddListener(ProduceChair);
+        sellChairButton.onClick.AddListener(SellChair);
 
         LoadGame();
         UpdateUI();
@@ -119,6 +136,9 @@ public class GameManager : MonoBehaviour
         hireWorkerButton.onClick.RemoveListener(HireWorker);
         workerEfficiencyUpgradeButton.onClick.RemoveListener(UpgradeWorkerEfficiency);
         hireAutoSellerButton.onClick.RemoveListener(HireAutoSeller);
+        unlockChairButton.onClick.RemoveListener(UnlockChair);
+        produceChairButton.onClick.RemoveListener(ProduceChair);
+        sellChairButton.onClick.RemoveListener(SellChair);
     }
 
     private void OnApplicationQuit()
@@ -202,6 +222,54 @@ public class GameManager : MonoBehaviour
         UpdateUI();
     }
 
+    private void UnlockChair()
+    {
+        if (chairUnlocked)
+        {
+            return;
+        }
+
+        if (money < chairUnlockCost)
+        {
+            return;
+        }
+
+        money -= chairUnlockCost;
+        chairUnlocked = true;
+        SaveGame();
+        UpdateUI();
+    }
+
+    private void ProduceChair()
+    {
+        if (!chairUnlocked)
+        {
+            return;
+        }
+
+        chairs += chairProductionPerClick;
+        SaveGame();
+        UpdateUI();
+    }
+
+    private void SellChair()
+    {
+        if (!chairUnlocked)
+        {
+            return;
+        }
+
+        if (chairs <= 0)
+        {
+            return;
+        }
+
+        chairs--;
+        money += chairSellPrice;
+        SaveGame();
+        UpdateUI();
+    }
+
     public void SaveGame()
     {
         PlayerPrefs.SetInt(SaveExistsKey, 1);
@@ -216,6 +284,10 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.SetInt(WorkerEfficiencyUpgradeCostKey, workerEfficiencyUpgradeCost);
         PlayerPrefs.SetInt(AutoSellersKey, autoSellers);
         PlayerPrefs.SetInt(AutoSellerCostKey, autoSellerCost);
+        PlayerPrefs.SetInt(ChairUnlockedKey, chairUnlocked ? 1 : 0);
+        PlayerPrefs.SetInt(ChairsKey, chairs);
+        PlayerPrefs.SetInt(ChairProductionPerClickKey, chairProductionPerClick);
+        PlayerPrefs.SetInt(ChairSellPriceKey, chairSellPrice);
         PlayerPrefs.SetString(LastSaveTimeKey, DateTime.UtcNow.Ticks.ToString());
         PlayerPrefs.Save();
     }
@@ -245,6 +317,10 @@ public class GameManager : MonoBehaviour
         workerEfficiencyUpgradeCost = PlayerPrefs.GetInt(WorkerEfficiencyUpgradeCostKey, workerEfficiencyUpgradeCost);
         autoSellers = PlayerPrefs.GetInt(AutoSellersKey, autoSellers);
         autoSellerCost = PlayerPrefs.GetInt(AutoSellerCostKey, autoSellerCost);
+        chairUnlocked = PlayerPrefs.GetInt(ChairUnlockedKey, chairUnlocked ? 1 : 0) == 1;
+        chairs = PlayerPrefs.GetInt(ChairsKey, chairs);
+        chairProductionPerClick = PlayerPrefs.GetInt(ChairProductionPerClickKey, chairProductionPerClick);
+        chairSellPrice = PlayerPrefs.GetInt(ChairSellPriceKey, chairSellPrice);
 
         ApplyOfflineProgress(lastSaveTime);
     }
@@ -263,6 +339,10 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.DeleteKey(WorkerEfficiencyUpgradeCostKey);
         PlayerPrefs.DeleteKey(AutoSellersKey);
         PlayerPrefs.DeleteKey(AutoSellerCostKey);
+        PlayerPrefs.DeleteKey(ChairUnlockedKey);
+        PlayerPrefs.DeleteKey(ChairsKey);
+        PlayerPrefs.DeleteKey(ChairProductionPerClickKey);
+        PlayerPrefs.DeleteKey(ChairSellPriceKey);
         PlayerPrefs.DeleteKey(LastSaveTimeKey);
 
         money = 0;
@@ -276,6 +356,10 @@ public class GameManager : MonoBehaviour
         workerEfficiencyUpgradeCost = 250;
         autoSellers = 0;
         autoSellerCost = 750;
+        chairUnlocked = false;
+        chairs = 0;
+        chairProductionPerClick = 1;
+        chairSellPrice = 50;
         workerTimer = 0f;
         autoSellTimer = 0f;
         autosaveTimer = 0f;
@@ -337,9 +421,20 @@ public class GameManager : MonoBehaviour
         workersText.text = $"Workers: {workers}";
         workerEfficiencyText.text = $"Worker Efficiency: x{workerEfficiencyLevel}";
         autoSellerText.text = $"Auto Sellers: {autoSellers}";
+        chairTitleText.text = "WOODEN CHAIR";
+        chairsText.text = $"Chairs: {chairs}";
         upgradeButton.GetComponentInChildren<TMP_Text>().text = $"UPGRADE - ${upgradeCost}";
         hireWorkerButton.GetComponentInChildren<TMP_Text>().text = $"HIRE WORKER - ${workerCost}";
         workerEfficiencyUpgradeButton.GetComponentInChildren<TMP_Text>().text = $"IMPROVE WORKERS - ${workerEfficiencyUpgradeCost}";
         hireAutoSellerButton.GetComponentInChildren<TMP_Text>().text = $"HIRE AUTO SELLER - ${autoSellerCost}";
+        unlockChairButton.GetComponentInChildren<TMP_Text>().text = $"UNLOCK CHAIRS - ${chairUnlockCost}";
+        produceChairButton.GetComponentInChildren<TMP_Text>().text = "PRODUCE CHAIR";
+        sellChairButton.GetComponentInChildren<TMP_Text>().text = $"SELL CHAIR - ${chairSellPrice}";
+
+        chairTitleText.gameObject.SetActive(chairUnlocked);
+        chairsText.gameObject.SetActive(chairUnlocked);
+        unlockChairButton.gameObject.SetActive(!chairUnlocked);
+        produceChairButton.gameObject.SetActive(chairUnlocked);
+        sellChairButton.gameObject.SetActive(chairUnlocked);
     }
 }
